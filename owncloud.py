@@ -1,9 +1,6 @@
 # -*- coding:utf-8 -*-
 
-import base64
-import urllib
-import urllib2
-import json
+import requests
 
 
 class Utilies(object):
@@ -13,27 +10,32 @@ class Utilies(object):
         self.password = password
 
     def auth_get(self, url):
-        request = urllib2.Request(url)
-        base64string = base64.b64encode('%s:%s' % (self.username, self.password))
-        request.add_header("Authorization", "Basic %s" % base64string)
-        response = urllib2.urlopen(request)
-        data = response.read()
-        return json.loads(data)['ocs']
+        r = requests.get(url, auth=(self.username, self.password))
+        if r.status_code == 200:
+            return r.json()['ocs']
+        else:
+            r.raise_for_status()
 
-    def auth_post(self, url, para_dict):
-        para_data = urllib.urlencode(para_dict)
-        request = urllib2.Request(url, para_data)
-        base64string = base64.b64encode('%s:%s' % (self.username, self.password))
-        request.add_header("Authorization", "Basic %s" % base64string)
-        response = urllib2.urlopen(request)
-        data = response.read()
-        return json.loads(data)['ocs']
+    def auth_post(self, url, param):
+        r = requests.post(url, auth=(self.username, self.password), param)
+        if r.status_code == 200:
+            return r.json()['ocs']
+        else:
+            r.raise_for_status()
 
-    def auth_put(self):
-        pass
+    def auth_put(self, url, param):
+        r = requests.put(url, auth=(self.username, self.password), param)
+        if r.status_code == 200:
+            return r.json()['ocs']
+        else:
+            r.raise_for_status()
 
-    def auth_delete(self):
-        pass
+    def auth_delete(self, url):
+        r = requests.delete(url, auth=(self.username, self.password))
+        if r.status_code == 200:
+            return r.json()['ocs']
+        else:
+            r.raise_for_status()
 
     def check_status(self, data):
         if data['meta']['statuscode'] == 100:
@@ -71,11 +73,11 @@ class OwncloudManager(object):
         url = '/users?format=json'.format(self.base_url)
         userid = raw_input('userid: ')
         password = raw_input('password: ')
-        para = {
+        param = {
             'userid': userid,
             'password': password
         }
-        data = self.utilies.auth_post(url, para)
+        data = self.utilies.auth_post(url, param)
         if self.utilies.check_status(data):
             print "create user ok"
         else:
@@ -106,24 +108,29 @@ class OwncloudManager(object):
             message = self.utilies.get_status_message(data)
             print 'get user error!: {}'.format(message)
 
-    def _edit_user(self, userid, key, data):
+    def _edit_user(self, userid, key, value):
         url = '{}/users/{}?format=json'.format(self.base_url, userid)
-        para = {
-            key: data
+        param = {
+            key: value
         }
-        print 'edit user {}'.format(key)
+        data = self.utilies.auth_put
+        if self.utilies.check_status(data):
+            print 'edit user {} ok'.format(key)
+        else:
+            message = self.utilies.get_status_message(data)
+            print 'edit user {} error!: {}'.format(key, message)
 
-    def edit_user_email(self, userid, data):
-        return self._edit_user(userid, 'email', data)
+    def edit_user_email(self, userid, value):
+        return self._edit_user(userid, 'email', value)
 
-    def edit_user_quota(self, userid, data):
-        return self._edit_user(userid, 'quota', data)
+    def edit_user_quota(self, userid, value):
+        return self._edit_user(userid, 'quota', value)
 
-    def edit_user_display(self, userid, data):
-        return self._edit_user(userid, 'display', data)
+    def edit_user_display(self, userid, value):
+        return self._edit_user(userid, 'display', value)
 
-    def edit_user_password(self, userid, data):
-        return self._edit_user(userid, 'password', data)
+    def edit_user_password(self, userid, value):
+        return self._edit_user(userid, 'password', value)
 
     def delete_user(self, userid):
         url = '{}/users/{}?format=json'.format(self.base_url, userid)
@@ -135,10 +142,10 @@ class OwncloudManager(object):
 
     def add_user_to_group(self, userid, groupid, create_group=False):
         url = '{}/users/{}/groups?format=json'.format(self.base_url, userid)
-        para = {
+        param = {
             'groupid': groupid
         }
-        data = self.utilies.auth_post(url, para)
+        data = self.utilies.auth_post(url, param)
         if self.utilies.check_status(data):
             print "add user to group ok"
         else:
@@ -149,26 +156,39 @@ class OwncloudManager(object):
                 message = self.utilies.get_status_message(data)
                 print 'add user to group error!: {}'.format(message)
 
-    def remove_user_to_group(self, userid, groupid):
+    def remove_user_from_group(self, userid, groupid):
         url = '{}/users/{}/groups?format=json'.format(self.base_url, userid)
-        para = {
+        param = {
             'groupid': groupid
         }
         pass
 
     def create_subadmin(self, userid, groupid):
         url = '{}/users/{}/subadmins?format=json'.format(self.base_url, userid)
-        para = {
+        param = {
             'groupid': groupid
         }
         pass
 
-    def create_group(self, groupid):
-        url = '{}/groups?format=json'.format(self.base_url)
-        para = {
+    def remove_subadmin(self, userid, groupid):
+        url = '{}/users/{}/subadmins?format=json'.format(self.base_url, userid)
+        param = {
             'groupid': groupid
         }
-        data = self.utilies.auth_post(url, para)
+        pass
+
+    def get_subadmin_groups(self, userid):
+        url = '{}/users/{}/subadmins?format=json'.format(self.base_url, userid)
+        pass
+
+    # groups
+
+    def create_group(self, groupid):
+        url = '{}/groups?format=json'.format(self.base_url)
+        param = {
+            'groupid': groupid
+        }
+        data = self.utilies.auth_post(url, param)
         if self.utilies.check_status(data):
             print "create group ok"
         else:
