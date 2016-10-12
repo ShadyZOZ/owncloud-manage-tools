@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 
+import click
 import requests
 
 
@@ -17,14 +18,14 @@ class Utilies(object):
             r.raise_for_status()
 
     def auth_post(self, url, param):
-        r = requests.post(url, auth=(self.username, self.password), param)
+        r = requests.post(url, param, auth=(self.username, self.password))
         if r.status_code == 200:
             return r.json()['ocs']
         else:
             r.raise_for_status()
 
     def auth_put(self, url, param):
-        r = requests.put(url, auth=(self.username, self.password), param)
+        r = requests.put(url, param, auth=(self.username, self.password))
         if r.status_code == 200:
             return r.json()['ocs']
         else:
@@ -56,13 +57,8 @@ class OwncloudManager(object):
     username = ''
     password = ''
 
-    def __init__(self):
-        url = raw_input('server address: ')
-        if not url.startswith('http://') and not url.startswith('https://'):
-            base_url = 'http://' + url
-        username = raw_input('admin username: ')
-        password = raw_input('admin password: ')
-        self.base_url = '{}/ocs/v1.php/cloud'.format(base_url)
+    def __init__(self, url, username, password):
+        self.base_url = '{}/ocs/v1.php/cloud'.format(url)
         self.username = username
         self.password = password
         self.utilies = Utilies(username, password)
@@ -70,7 +66,7 @@ class OwncloudManager(object):
     # users
 
     def add_user(self):
-        url = '/users?format=json'.format(self.base_url)
+        url = '{}/users?format=json'.format(self.base_url)
         userid = raw_input('userid: ')
         password = raw_input('password: ')
         param = {
@@ -85,7 +81,7 @@ class OwncloudManager(object):
             print 'create user error!: {}'.format(message)
 
     def get_users(self):
-        url = '/users?format=json'.format(self.base_url)
+        url = '{}/users?format=json'.format(self.base_url)
         data = self.utilies.auth_get(url)
         if self.utilies.check_status(data):
             users = data['data']['users']
@@ -195,6 +191,24 @@ class OwncloudManager(object):
             message = self.utilies.get_status_message(data)
             print 'create group error!: {}'.format(message)
 
+
+def cli():
+    url = raw_input('server address: ')
+    if not url.startswith('http://') and not url.startswith('https://'):
+        url = 'http://' + url
+    username = raw_input('admin username: ')
+    password = raw_input('admin password: ')
+    manager = OwncloudManager(url, username, password)
+    run_command(manager, 'get_users')
+
+
+def run_command(manager, command_name, *args):
+    func = getattr(manager, command_name, None)
+    if func is None:
+        print 'command not found'
+    else:
+        func(*args)
+
+
 if __name__ == '__main__':
-    manager = OwncloudManager()
-    manager.create_group()
+    cli()
